@@ -1,4 +1,5 @@
 import sys
+from array import array
 from typing import Sequence, TypeVar
 
 T = TypeVar("T")
@@ -40,7 +41,7 @@ def order_change_blocks(operations: list[tuple[str, T]]) -> list[tuple[str, T]]:
 
 
 def backtrack(
-    trace: list[dict[int, int]],
+    trace: list[array],
     a: Sequence[T],
     b: Sequence[T],
     d: int,
@@ -51,13 +52,22 @@ def backtrack(
     ops: list[tuple[str, T]] = []
 
     for step in range(d, 0, -1):
-        v_prev = trace[step]
-        if k == -step or (k != step and v_prev.get(k - 1, -1) < v_prev.get(k + 1, -1)):
-            prev_k = k + 1
-        else:
-            prev_k = k - 1
+        v_prev = trace[step - 1]
 
-        start_x = v_prev[prev_k]
+        if k == -step:
+            prev_k = k + 1
+        elif k == step:
+            prev_k = k - 1
+        else:
+            left = v_prev[(k - 1 + step - 1) // 2]
+            right = v_prev[(k + 1 + step - 1) // 2]
+
+            if left < right:
+                prev_k = k + 1
+            else:
+                prev_k = k - 1
+
+        start_x = v_prev[(prev_k + step - 1) // 2]
         start_y = start_x - prev_k
 
         if prev_k == k + 1:
@@ -95,28 +105,51 @@ def myers_diff(a: Sequence[T], b: Sequence[T]) -> list[tuple[str, T]]:
     m = len(b)
     max_d = n + m
 
-    v: dict[int, int] = {1: 0}
-    trace: list[dict[int, int]] = []
+    x = 0
+    y = 0
 
-    for d in range(max_d + 1):
-        v_copy = dict(v)
-        trace.append(v_copy)
+    while x < n and y < m and a[x] == b[y]:
+        x += 1
+        y += 1
 
-        for k in range(-d, d + 1, 2):
-            if k == -d or (k != d and v_copy.get(k - 1, -1) < v_copy.get(k + 1, -1)):
-                x = v_copy[k + 1]
+    trace: list[array] = [array("i", [x])]
+
+    if x >= n and y >= m:
+        return [("keep", a[i]) for i in range(n)]
+
+    previous = trace[0]
+
+    for d in range(1, max_d + 1):
+        current = array("i", [0]) * (d + 1)
+
+        for index, k in enumerate(range(-d, d + 1, 2)):
+            if k == -d:
+                x = previous[0]
+            elif k == d:
+                x = previous[-1] + 1
             else:
-                x = v_copy[k - 1] + 1
+                left = previous[(k - 1 + d - 1) // 2]
+                right = previous[(k + 1 + d - 1) // 2]
+
+                if left < right:
+                    x = right
+                else:
+                    x = left + 1
+
             y = x - k
 
             while x < n and y < m and a[x] == b[y]:
                 x += 1
                 y += 1
 
-            v[k] = x
+            current[index] = x
 
             if x >= n and y >= m:
+                trace.append(current)
                 return backtrack(trace, a, b, d, k)
+
+        trace.append(current)
+        previous = current
 
     return []
 
